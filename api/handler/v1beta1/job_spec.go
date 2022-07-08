@@ -17,6 +17,9 @@ import (
 
 	pb "github.com/odpf/optimus/api/proto/odpf/optimus/core/v1beta1"
 	"github.com/odpf/optimus/core/progress"
+	st "github.com/odpf/optimus/core/progress/stream"
+	"github.com/odpf/optimus/core/progress/stream/event"
+	"github.com/odpf/optimus/core/progress/stream/sender"
 	"github.com/odpf/optimus/models"
 	"github.com/odpf/optimus/service"
 )
@@ -38,11 +41,14 @@ type JobSpecServiceServer struct {
 
 func (sv *JobSpecServiceServer) DeployJobSpecification(stream pb.JobSpecificationService_DeployJobSpecificationServer) error {
 	observers := sv.newObserverChain()
-	observers.Join(&jobDeploymentObserver{
-		stream: stream,
-		log:    sv.l,
-		mu:     new(sync.Mutex),
-	})
+	// observers.Join(&jobDeploymentObserver{
+	// 	stream: stream,
+	// 	log:    sv.l,
+	// 	mu:     new(sync.Mutex),
+	// })
+	jobDeploymentSender := sender.NewJobDeploymentSender(stream)
+	streamObserver := st.NewObserver(sv.l, jobDeploymentSender)
+	observers.Join(streamObserver)
 
 	for {
 		req, err := stream.Recv()
@@ -63,16 +69,19 @@ func (sv *JobSpecServiceServer) DeployJobSpecification(stream pb.JobSpecificatio
 		deployID, err := sv.jobSvc.Deploy(stream.Context(), req.GetProjectName(), req.GetNamespaceName(), jobSpecs, observers)
 		if err != nil {
 			err = fmt.Errorf("error while deploying namespace %s: %w", req.NamespaceName, err)
-			observers.Notify(&models.ProgressJobDeploymentRequestCreated{Err: err})
+			observers.Notify(event.NewError(err))
+			// observers.Notify(&models.ProgressJobDeploymentRequestCreated{Err: err})
 			sv.l.Warn(fmt.Sprintf("there's error while deploying namespaces: [%s]", req.NamespaceName))
+			observers.Notify(event.NewWarn("warning example"))
 			continue
 		}
 
 		sv.l.Info(fmt.Sprintf("deployID %s holds deployment for namespace %s\n", deployID.UUID().String(), req.NamespaceName))
-		observers.Notify(&models.ProgressJobDeploymentRequestCreated{DeployID: deployID})
+		// observers.Notify(&models.ProgressJobDeploymentRequestCreated{DeployID: deployID})
 	}
 
 	sv.l.Info("job deployment is successfully submitted")
+	observers.Notify(event.NewSuccess("job deployment is successfully submitted"))
 
 	return nil
 }

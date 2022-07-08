@@ -442,6 +442,18 @@ func (d *deployCommand) processJobDeploymentResponses(namespaceName string, stre
 			return "", err
 		}
 
+		if resp.Event != nil {
+			switch resp.Event.Status {
+			case "success":
+				d.logger.Info(resp.Event.Message)
+			case "warning":
+				d.logger.Warn(resp.Event.Message)
+			case "error":
+				d.logger.Error(resp.Event.Message)
+			}
+			continue
+		}
+
 		switch resp.Type {
 		case models.ProgressTypeJobDependencyResolution:
 			failedMessage := fmt.Sprintf("[%s] error '%s': failed to resolve dependency, %s", namespaceName, resp.GetJobName(), resp.GetValue())

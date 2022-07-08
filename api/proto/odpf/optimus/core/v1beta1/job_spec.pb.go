@@ -195,6 +195,13 @@ type DeployJobSpecificationResponse struct {
 	// response type differentiate events
 	Type  string `protobuf:"bytes,5,opt,name=type,proto3" json:"type,omitempty"`
 	Value string `protobuf:"bytes,6,opt,name=value,proto3" json:"value,omitempty"`
+
+	Event *Event
+}
+
+type Event struct {
+	Status string
+	Message string
 }
 
 func (x *DeployJobSpecificationResponse) Reset() {
