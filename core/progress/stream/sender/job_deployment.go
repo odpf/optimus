@@ -18,6 +18,7 @@ func NewJobDeploymentSender(stream pb.JobSpecificationService_DeployJobSpecifica
 func (s *jobDeploymentStreamSender) Send(msg string) error {
 	e := event.GetEvent(msg)
 	resp := &pb.DeployJobSpecificationResponse{}
+	resp.Event.Type = e.Type()
 	resp.Event.Status = e.Status()
 	resp.Event.Message = e.Message()
 	return s.stream.Send(resp)

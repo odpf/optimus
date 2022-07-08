@@ -200,6 +200,7 @@ type DeployJobSpecificationResponse struct {
 }
 
 type Event struct {
+	Type string
 	Status string
 	Message string
 }

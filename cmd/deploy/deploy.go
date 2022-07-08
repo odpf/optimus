@@ -443,6 +443,10 @@ func (d *deployCommand) processJobDeploymentResponses(namespaceName string, stre
 		}
 
 		if resp.Event != nil {
+			// if we aimed to treat deploymentID as an event (not suggested)
+			if resp.Type == "async" && resp.Event.Status == "deployment" {
+				return resp.Message, nil
+			}
 			switch resp.Event.Status {
 			case "success":
 				d.logger.Info(resp.Event.Message)

@@ -69,19 +69,23 @@ func (sv *JobSpecServiceServer) DeployJobSpecification(stream pb.JobSpecificatio
 		deployID, err := sv.jobSvc.Deploy(stream.Context(), req.GetProjectName(), req.GetNamespaceName(), jobSpecs, observers)
 		if err != nil {
 			err = fmt.Errorf("error while deploying namespace %s: %w", req.NamespaceName, err)
-			observers.Notify(event.NewError(err))
+			observers.Notify(event.NewProgressError(err))
 			// observers.Notify(&models.ProgressJobDeploymentRequestCreated{Err: err})
 			sv.l.Warn(fmt.Sprintf("there's error while deploying namespaces: [%s]", req.NamespaceName))
-			observers.Notify(event.NewWarn("warning example"))
+			observers.Notify(event.NewProgressWarn("warning example"))
 			continue
 		}
 
 		sv.l.Info(fmt.Sprintf("deployID %s holds deployment for namespace %s\n", deployID.UUID().String(), req.NamespaceName))
 		// observers.Notify(&models.ProgressJobDeploymentRequestCreated{DeployID: deployID})
+		observers.Notify(event.NewAsyncDeployment(deployID.UUID().String()))
+		// if deploymentID is not treated as an event:
+		// just pass it to the stream
+		// stream.Send(&pb.DeployJobSpecificationResponse{DeploymentID: deployID})
 	}
 
 	sv.l.Info("job deployment is successfully submitted")
-	observers.Notify(event.NewSuccess("job deployment is successfully submitted"))
+	observers.Notify(event.NewProgressSuccess("job deployment is successfully submitted"))
 
 	return nil
 }

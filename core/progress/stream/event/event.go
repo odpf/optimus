@@ -1,31 +1,31 @@
 package event
 
 import (
-	"errors"
 	"strings"
 
 	"github.com/odpf/optimus/core/progress"
 )
 
-type StreamEvent interface {
+// Medium to convert progress.Event to Event protobuf
+type StreamEvent interface { // similar with event protobuf
 	progress.Event
-	Status() string
+	Type() string   // progress, async
+	Status() string // success, warning, error
 	Message() string
 }
 
-// Adapter to convert string to StreamEvent
-// error: example message
-// success: example message
-// warning: example message
+// progress: error: example message
+// progress: success: example message
+// progress: warning: example message
+// async: deployment: 12345
 func GetEvent(s string) StreamEvent {
 	switch ss := strings.Split(s, ":"); ss[0] {
-	case "error":
-		return NewError(errors.New(ss[1]))
-	case "success":
-		return NewSuccess(ss[1])
-	case "warning":
-		return NewWarn(ss[1])
-	default:
-		return nil
+	case "progress":
+		// example Success
+		return NewProgressSuccess(ss[2])
+	case "async":
+		// example deployment async
+		return NewAsyncDeployment(ss[2])
 	}
+	return nil
 }
