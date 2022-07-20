@@ -7,7 +7,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
-	tMock "github.com/stretchr/testify/mock"
 
 	"github.com/odpf/optimus/datastore"
 	"github.com/odpf/optimus/mock"
@@ -278,7 +277,7 @@ func TestService(t *testing.T) {
 			defer resourceRepoFac.AssertExpectations(t)
 
 			service := datastore.NewService(resourceRepoFac, nil)
-			err := service.UpdateResource(ctx, namespaceSpec, []models.ResourceSpec{resourceSpec}, nil)
+			err := service.UpdateResource(ctx, namespaceSpec, []models.ResourceSpec{resourceSpec}, nil, nil)
 			assert.Error(t, err)
 		})
 
@@ -310,7 +309,7 @@ func TestService(t *testing.T) {
 			defer projectResourceRepoFac.AssertExpectations(t)
 
 			service := datastore.NewService(resourceRepoFac, nil)
-			err := service.UpdateResource(ctx, namespaceSpec, []models.ResourceSpec{resourceSpec}, nil)
+			err := service.UpdateResource(ctx, namespaceSpec, []models.ResourceSpec{resourceSpec}, nil, nil)
 			assert.NoError(t, err)
 		})
 
@@ -349,7 +348,7 @@ func TestService(t *testing.T) {
 			defer resourceRepoFac.AssertExpectations(t)
 
 			service := datastore.NewService(resourceRepoFac, nil)
-			err := service.UpdateResource(ctx, namespaceSpec, []models.ResourceSpec{incomingSpec}, nil)
+			err := service.UpdateResource(ctx, namespaceSpec, []models.ResourceSpec{incomingSpec}, nil, nil)
 			assert.Error(t, err)
 		})
 
@@ -384,7 +383,7 @@ func TestService(t *testing.T) {
 			defer resourceRepoFac.AssertExpectations(t)
 
 			service := datastore.NewService(resourceRepoFac, dsRepo)
-			err := service.UpdateResource(ctx, namespaceSpec, []models.ResourceSpec{incomingSpec}, nil)
+			err := service.UpdateResource(ctx, namespaceSpec, []models.ResourceSpec{incomingSpec}, nil, nil)
 			assert.NoError(t, err)
 		})
 
@@ -428,11 +427,8 @@ func TestService(t *testing.T) {
 			projectResourceRepoFac := new(mock.ProjectResourceSpecRepoFactory)
 			defer projectResourceRepoFac.AssertExpectations(t)
 
-			obs := &mock.PipelineLogObserver{}
-			obs.On("Notify", tMock.Anything).Return()
-
 			service := datastore.NewService(resourceRepoFac, dsRepo)
-			err := service.UpdateResource(ctx, namespaceSpec, []models.ResourceSpec{incomingSpec}, obs)
+			err := service.UpdateResource(ctx, namespaceSpec, []models.ResourceSpec{incomingSpec}, nil, nil)
 			assert.NoError(t, err)
 		})
 	})
