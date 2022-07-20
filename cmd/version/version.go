@@ -110,6 +110,7 @@ func (v *versionCommand) printAllPluginInfos() {
 			v.logger.Info(fmt.Sprintf("Depends on: %v", schema.DependsOn))
 		}
 	}
+	models.YamlPluginRegistry.PrintAllPlugins(v.logger)
 }
 
 // getVersionRequest send a version request to service
