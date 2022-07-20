@@ -36,7 +36,7 @@ func NewPluginCommand() *cobra.Command {
 }
 
 func (p *pluginCommand) PersistentPreRunE(cmd *cobra.Command, _ []string) error {
-	c, err := config.LoadServerConfig(p.configFilePath, cmd.Flags())
+	c, err := config.LoadServerConfig(p.configFilePath)
 	if err != nil {
 		return err
 	}
