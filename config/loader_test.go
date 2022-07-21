@@ -273,6 +273,9 @@ func (s *ConfigTestSuite) initExpectedServerConfig() {
 	s.expectedServerConfig.Telemetry = config.TelemetryConfig{}
 	s.expectedServerConfig.Telemetry.ProfileAddr = ":9110"
 	s.expectedServerConfig.Telemetry.JaegerAddr = "http://localhost:14268/api/traces"
+
+	s.expectedServerConfig.Plugin = config.PluginConfig{}
+	s.expectedServerConfig.Plugin.Dir = "."
 }
 
 func (*ConfigTestSuite) initServerConfigEnv() {

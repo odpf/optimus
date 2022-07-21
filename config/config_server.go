@@ -10,6 +10,7 @@ type ServerConfig struct {
 	Serve     Serve           `mapstructure:"serve"`
 	Scheduler SchedulerConfig `mapstructure:"scheduler"`
 	Telemetry TelemetryConfig `mapstructure:"telemetry"`
+	Plugin    PluginConfig    `mapstructure:"plugin"`
 }
 
 type Serve struct {
@@ -52,4 +53,9 @@ type SchedulerConfig struct {
 type TelemetryConfig struct {
 	ProfileAddr string `mapstructure:"profile_addr"`
 	JaegerAddr  string `mapstructure:"jaeger_addr"`
+}
+
+type PluginConfig struct {
+	Dir       string   `mapstructure:"dir" default:"."`
+	Artifacts []string `mapstructure:"artifacts"`
 }
