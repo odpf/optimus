@@ -2,6 +2,7 @@ package service_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -65,7 +66,14 @@ func TestMonitoringService(t *testing.T) {
 	sensorRunRepository := new(mock.SensorRunRepository)
 
 	hookRunRepository := new(mock.HookRunRepository)
+	jobDestination := "p.d.t"
+	pluginService := new(mock.DependencyResolverPluginService)
+	destination := &models.GenerateDestinationResponse{
+		Destination: jobDestination,
+		Type:        models.DestinationTypeBigquery,
+	}
 	monitoringService := service.NewMonitoringService(
+		pluginService,
 		jobRunMetricsRepository,
 		sensorRunRepository,
 		hookRunRepository,
@@ -87,8 +95,12 @@ func TestMonitoringService(t *testing.T) {
 				namespaceSpec,
 				jobSpec,
 				slaMissDurationInSec,
+				jobDestination,
 			).Return(nil)
 			defer jobRunMetricsRepository.AssertExpectations(t)
+
+			pluginService.On("GenerateDestination", ctx, jobSpec, namespaceSpec).Return(destination, nil).Once()
+			defer pluginService.AssertExpectations(t)
 			err = monitoringService.ProcessEvent(ctx, jobStartEvent, namespaceSpec, jobSpec)
 			assert.Nil(t, err)
 		})
@@ -132,7 +144,7 @@ func TestMonitoringService(t *testing.T) {
 				defer taskRunRepository.AssertExpectations(t)
 
 				jobRunMetricsRepository.On(
-					"GetActiveJobRun",
+					"GetLatestJobRunByScheduledTime",
 					ctx,
 					event.Value["scheduled_at"].GetStringValue(),
 					namespaceSpec,
@@ -164,7 +176,7 @@ func TestMonitoringService(t *testing.T) {
 				defer taskRunRepository.AssertExpectations(t)
 
 				jobRunMetricsRepository.On(
-					"GetActiveJobRun",
+					"GetLatestJobRunByScheduledTime",
 					ctx,
 					event.Value["scheduled_at"].GetStringValue(),
 					namespaceSpec,
@@ -199,7 +211,7 @@ func TestMonitoringService(t *testing.T) {
 				defer sensorRunRepository.AssertExpectations(t)
 
 				jobRunMetricsRepository.On(
-					"GetActiveJobRun",
+					"GetLatestJobRunByScheduledTime",
 					ctx,
 					event.Value["scheduled_at"].GetStringValue(),
 					namespaceSpec,
@@ -231,7 +243,7 @@ func TestMonitoringService(t *testing.T) {
 				defer sensorRunRepository.AssertExpectations(t)
 
 				jobRunMetricsRepository.On(
-					"GetActiveJobRun",
+					"GetLatestJobRunByScheduledTime",
 					ctx,
 					event.Value["scheduled_at"].GetStringValue(),
 					namespaceSpec,
@@ -266,7 +278,7 @@ func TestMonitoringService(t *testing.T) {
 				defer hookRunRepository.AssertExpectations(t)
 
 				jobRunMetricsRepository.On(
-					"GetActiveJobRun",
+					"GetLatestJobRunByScheduledTime",
 					ctx,
 					event.Value["scheduled_at"].GetStringValue(),
 					namespaceSpec,
@@ -298,7 +310,7 @@ func TestMonitoringService(t *testing.T) {
 				defer hookRunRepository.AssertExpectations(t)
 
 				jobRunMetricsRepository.On(
-					"GetActiveJobRun",
+					"GetLatestJobRunByScheduledTime",
 					ctx,
 					event.Value["scheduled_at"].GetStringValue(),
 					namespaceSpec,
@@ -309,6 +321,18 @@ func TestMonitoringService(t *testing.T) {
 				err := monitoringService.ProcessEvent(ctx, event, namespaceSpec, jobSpec)
 				assert.Nil(t, err)
 			})
+		})
+		t.Run("Throw Error If generate Destination Fails", func(t *testing.T) {
+			jobStartEvent := models.JobEvent{
+				Type:  models.JobStartEvent,
+				Value: eventValues.GetFields(),
+			}
+
+			generateDestinationErr := "generateDestinationErr"
+			pluginService.On("GenerateDestination", ctx, jobSpec, namespaceSpec).Return(&models.GenerateDestinationResponse{}, errors.New(generateDestinationErr)).Once()
+			defer pluginService.AssertExpectations(t)
+			err := monitoringService.ProcessEvent(ctx, jobStartEvent, namespaceSpec, jobSpec)
+			assert.ErrorContains(t, err, generateDestinationErr)
 		})
 	})
 }

@@ -3,12 +3,17 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
+	"time"
+
+	"github.com/google/uuid"
 
 	"github.com/odpf/optimus/models"
 	"github.com/odpf/optimus/store"
 )
 
 type monitoringService struct {
+	PluginService           PluginService
 	JobRunMetricsRepository store.JobRunMetricsRepository
 	TaskRunRepository       store.TaskRunRepository
 	SensorRunRepository     store.SensorRunRepository
@@ -17,23 +22,42 @@ type monitoringService struct {
 
 type MonitoringService interface {
 	ProcessEvent(context.Context, models.JobEvent, models.NamespaceSpec, models.JobSpec) error
+	GetJobRunByScheduledAt(context.Context, models.NamespaceSpec, models.JobSpec, time.Time) (models.JobRunSpec, error)
+	GetJobRunByRunID(context.Context, uuid.UUID) (models.JobRunSpec, error)
+}
+
+func (m monitoringService) GetJobRunByScheduledAt(ctx context.Context, namespaceSpec models.NamespaceSpec, jobSpec models.JobSpec, scheduledAt time.Time) (models.JobRunSpec, error) {
+	return m.JobRunMetricsRepository.GetLatestJobRunByScheduledTime(ctx, scheduledAt.Format(store.ISODateFormat), namespaceSpec, jobSpec)
+}
+func (m monitoringService) GetJobRunByRunID(ctx context.Context, jobRunID uuid.UUID) (models.JobRunSpec, error) {
+	return m.JobRunMetricsRepository.GetByID(ctx, jobRunID)
 }
 
 func (m monitoringService) registerNewJobRun(ctx context.Context, event models.JobEvent, namespaceSpec models.NamespaceSpec, jobSpec models.JobSpec) error {
+	var jobDestination string
+	dest, err := m.PluginService.GenerateDestination(ctx, jobSpec, namespaceSpec)
+	if err != nil {
+		if !errors.Is(err, ErrDependencyModNotFound) {
+			return fmt.Errorf("failed to generate destination for job %s: %w", jobSpec.Name, err)
+		}
+	}
+	if dest != nil {
+		jobDestination = dest.Destination
+	}
 	slaDefinitionInSec, err := jobSpec.SLADuration()
 	if err != nil {
 		return err
 	}
-	return m.JobRunMetricsRepository.Save(ctx, event, namespaceSpec, jobSpec, slaDefinitionInSec)
+	return m.JobRunMetricsRepository.Save(ctx, event, namespaceSpec, jobSpec, slaDefinitionInSec, jobDestination)
 }
 
 func (m monitoringService) updateJobRun(ctx context.Context, event models.JobEvent, namespaceSpec models.NamespaceSpec, jobSpec models.JobSpec) error {
 	return m.JobRunMetricsRepository.Update(ctx, event, namespaceSpec, jobSpec)
 }
 
-func (m monitoringService) getActiveJobRun(ctx context.Context, event models.JobEvent, namespaceSpec models.NamespaceSpec, jobSpec models.JobSpec) (models.JobRunSpec, error) {
+func (m monitoringService) GetLatestJobRunByScheduledTime(ctx context.Context, event models.JobEvent, namespaceSpec models.NamespaceSpec, jobSpec models.JobSpec) (models.JobRunSpec, error) {
 	eventPayload := event.Value
-	jobRunSpec, err := m.JobRunMetricsRepository.GetActiveJobRun(ctx, eventPayload["scheduled_at"].GetStringValue(), namespaceSpec, jobSpec)
+	jobRunSpec, err := m.JobRunMetricsRepository.GetLatestJobRunByScheduledTime(ctx, eventPayload["scheduled_at"].GetStringValue(), namespaceSpec, jobSpec)
 	if err != nil {
 		return jobRunSpec, err
 	}
@@ -41,7 +65,7 @@ func (m monitoringService) getActiveJobRun(ctx context.Context, event models.Job
 }
 
 func (m monitoringService) registerTaskRunEvent(ctx context.Context, event models.JobEvent, namespaceSpec models.NamespaceSpec, jobSpec models.JobSpec) error {
-	jobRunSpec, err := m.getActiveJobRun(ctx, event, namespaceSpec, jobSpec)
+	jobRunSpec, err := m.GetLatestJobRunByScheduledTime(ctx, event, namespaceSpec, jobSpec)
 	if err != nil {
 		return err
 	}
@@ -56,7 +80,7 @@ func (m monitoringService) registerTaskRunEvent(ctx context.Context, event model
 }
 
 func (m monitoringService) registerSensorRunEvent(ctx context.Context, event models.JobEvent, namespaceSpec models.NamespaceSpec, jobSpec models.JobSpec) error {
-	jobRunSpec, err := m.getActiveJobRun(ctx, event, namespaceSpec, jobSpec)
+	jobRunSpec, err := m.GetLatestJobRunByScheduledTime(ctx, event, namespaceSpec, jobSpec)
 	if err != nil {
 		return err
 	}
@@ -70,7 +94,7 @@ func (m monitoringService) registerSensorRunEvent(ctx context.Context, event mod
 	return m.SensorRunRepository.Update(ctx, event, jobRunSpec)
 }
 func (m monitoringService) registerHookRunEvent(ctx context.Context, event models.JobEvent, namespaceSpec models.NamespaceSpec, jobSpec models.JobSpec) error {
-	jobRunSpec, err := m.getActiveJobRun(ctx, event, namespaceSpec, jobSpec)
+	jobRunSpec, err := m.GetLatestJobRunByScheduledTime(ctx, event, namespaceSpec, jobSpec)
 	if err != nil {
 		return err
 	}
@@ -99,11 +123,13 @@ func (m monitoringService) ProcessEvent(ctx context.Context, event models.JobEve
 	return nil
 }
 
-func NewMonitoringService(jobRunMetricsRepository store.JobRunMetricsRepository,
+func NewMonitoringService(pluginService PluginService,
+	jobRunMetricsRepository store.JobRunMetricsRepository,
 	sensorRunRepository store.SensorRunRepository,
 	hookRunRepository store.HookRunRepository,
 	taskRunRepository store.TaskRunRepository) *monitoringService {
 	return &monitoringService{
+		PluginService:           pluginService,
 		TaskRunRepository:       taskRunRepository,
 		JobRunMetricsRepository: jobRunMetricsRepository,
 		SensorRunRepository:     sensorRunRepository,
